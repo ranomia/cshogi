@@ -1,6 +1,9 @@
 from setuptools import setup
 from Cython.Build import build_ext, cythonize
 from setuptools import Extension
+import platform
+
+IS_X86 = platform.machine() in ("x86_64", "AMD64", "i386", "i686")
 
 
 class MyBuildExt(build_ext):
@@ -10,20 +13,30 @@ class MyBuildExt(build_ext):
                 e.extra_compile_args.extend(
                     [
                         "-std=c++17",
-                        "-msse4.2",
-                        "-mavx2",
                         "-Wno-enum-constexpr-conversion",
                     ]
                 )
+                if IS_X86:
+                    e.extra_compile_args.extend(
+                        [
+                            "-msse4.2",
+                            "-mavx2",
+                        ]
+                    )
         elif self.compiler.compiler_type == "msvc":
             for e in self.extensions:
                 e.extra_compile_args.extend(
                     [
                         "/std:c17",
-                        "/arch:SSE42",
-                        "/arch:AVX2",
                     ]
                 )
+                if IS_X86:
+                    e.extra_compile_args.extend(
+                        [
+                            "/arch:SSE42",
+                            "/arch:AVX2",
+                        ]
+                    )
 
         super(MyBuildExt, self).build_extensions()
 
@@ -40,6 +53,16 @@ class MyBuildExt(build_ext):
 
         self.include_dirs.append(numpy.get_include())
 
+
+macros = []
+if IS_X86:
+    macros.extend(
+        [
+            ("HAVE_SSE4", None),
+            ("HAVE_SSE42", None),
+            ("HAVE_AVX2", None),
+        ]
+    )
 
 ext_modules = [
     Extension(
@@ -63,11 +86,7 @@ ext_modules = [
         ],
         language="c++",
         include_dirs=["src"],
-        define_macros=[
-            ("HAVE_SSE4", None),
-            ("HAVE_SSE42", None),
-            ("HAVE_AVX2", None),
-        ],
+        define_macros=macros,
     ),
     Extension(
         "cshogi.gym_shogi.envs.shogi_env",
